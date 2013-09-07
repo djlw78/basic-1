@@ -10,7 +10,7 @@ Originally written around Spring 2001 for Linux 2.2, recently updated
 
 ## Example program
 
-<code>
+<pre>
 10 print "give me a number"
 20 input ia
 30 let ic = 0
@@ -18,4 +18,4 @@ Originally written around Spring 2001 for Linux 2.2, recently updated
 50 if ((ia%ib)=0) then let ic = (ic+1)
 60 next
 70 print "the number " ia " has " ic " factors"
-</code>
+</pre>
