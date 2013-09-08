@@ -12,6 +12,7 @@
 section .text
 
 global main
+
 main:
 puts "BASIC2", 10, 10
 
@@ -35,43 +36,43 @@ mov edx, NUM
 mov eax, 123
 call stput
 
-.a:
+; TODO dump st, heap info command
+
+prompt:
 puts ">"
 call reads		; return ecx=str
-call gnt
+call gnt		; populates edi:edx:ebx:eax
 cmp edx, 0
-je .a
+je prompt
 cmp edx, SYM
-je .s
+je .sym
 ; TODO define line
 puts "unexpected token "
 putr edx
 puts 10
-jmp .a
-
-.s:
-call stget		; populates edx:eax
+jmp prompt
+.sym:
+call stget		; populates edx:ebx:eax
 cmp edx, FUN
-je .s2
+je .sym2
 ; TODO call let
 puts "unknown symbol", 10
-jmp .a
-.s2:
-call eax			; call the basic command...
-jmp .a
+jmp prompt
+.sym2:
+call eax		; call the basic command...
+jmp prompt
 
 
 
 basiclet: ; LET sym = exp
-puts "LET", 10
-; x = 10
+; let x = 10
 call gnt
 cmp edx, SYM
 je .s
 puts "let: missing symbol", 10
 ret
 .s:
-push ebx		; push the symbol
+push edi		; push the symbol
 call gnt
 cmp edx, CHR
 je .c
@@ -92,7 +93,7 @@ puts "let: missing expression", 10
 add esp, byte 4
 ret
 .e:
-pop ebx
+pop edi
 call stput		; associate symbol with value...
 ret
 
@@ -103,21 +104,19 @@ basicprint: 		; PRINT {exp} [;]
 .a:
 call gne
 cmp edx, NUM
-je .n
+je .num
 cmp edx, STR
-je .s
+je .str
 puts 10
 ret
-.s: ; eax=str, ebx=len
-puts "_"
+.str: ; eax=str, ebx=len
 push ecx
 mov ecx, eax
 mov edx, ebx
 call write
 pop ecx
-puts "_"
 jmp .a
-.n: ; eax=num
+.num: ; eax=num
 push ecx
 mov ecx, buf
 call itoa
@@ -129,84 +128,93 @@ jmp .a
 
 
 
-gne: ; ecx = str, edx=type(2=num,3=str), eax=val
+gne: ; get next expression - ecx=str, edx=type(2=num,3=str), ebx:eax=val
 ; exp = val [chr exp]
 call gnv
 cmp edx, 0
 jne .b
 ret
 .b:
+push ecx		; push str ptr
 push edx		; push type
-push eax		; push value
-push ecx		; push str
+push ebx		; push hi val
+push eax		; push lo val
 call gnt		; see if next token is chr
 cmp edx, CHR
 je .c
-pop ecx			; pop str
-pop eax			; pop val
+pop eax			; pop lo val
+pop ebx			; pop hi val
 pop edx			; pop type
-ret
+pop ecx			; pop str
+ret			; return, no expression, just a value
 .c:
 push eax		; push the chr
-call gne
+call gne		; populates edx:ebx:eax...
 cmp edx, 0
 jne .d
 puts "gne: missing expression", 10
-add esp, byte 16
+add esp, byte 20
 mov edx, 0
 ret
 .d:
-pop ebp			; pop chr
-add esp, byte 4		; skip str
-pop esi			; pop orig eax
-pop edi			; pop orig edx
-; ---- evaluate edx:eax = edx:eax ebp edi:esi ----
+mov [esp+16],ecx	; update str ptr on stack - bit of a hack
+pop ecx			; pop chr 
+pop esi			; pop orig lo val
+pop ebp			; pop orig hi val
+pop edi			; pop orig type
+; [esp]=ecx
+; ---- evaluate edx:ebx:eax = edi:ebp:esi *ecx* edx:ebx:eax ----
 cmp edi, NUM
-je .n
+je .num
 puts "gne: bad expression", 10
+add esp, byte 4
 mov edx, 0
 ret
-.n:
+.num:
 cmp edx, NUM
-je .n2
+je .num2
 puts "gne: bad numeric expression", 10
+add esp, byte 4
 mov edx, 0
 ret
-.n2:
+.num2:
 mov edx, NUM
-cmp ebp, byte '+'
+cmp ecx, byte '+'
 je .nadd
-cmp ebp, byte '-'
+cmp ecx, byte '-'
 je .nsub
-cmp ebp, byte '='
+cmp ecx, byte '='
 je .neq
-cmp ebp, byte '*'
+cmp ecx, byte '*'
 je .nmul
 puts "gne: bad numeric operator", 10
+add esp, byte 4
 mov edx, 0
 ret
 .nadd:
 add eax, esi
-ret
+jmp .end
 .nsub:
 sub esi, eax
 mov eax, esi
-ret
+jmp .end
 .neq:
 ; could use a boolean type...
 cmp eax, esi
 je .neqe
 mov eax, 0
-ret
+jmp .end
 .neqe:
 mov eax, 1
-ret
+jmp .end
 .nmul:
 imul eax, esi
+.end:
+pop ecx			; overwrite op with str ptr
 ret
 
 
-gnv: ; ecx=str, edx=type(2=num,3=str) eax=value
+gnv: ; get next value - ecx=str, edx=type(2=num,3=str) ebx:eax=value
 ; val = num | str | sym | (exp)
 call gnt
 cmp edx, SYM
@@ -224,7 +232,7 @@ call stget	; might be function...
 ret
 
 
-gnt: ; ecx=str, edx=type(1=sym,2=num,3=str,4=chr), eax=val, ebx=sym/strlen
+gnt: ; get next token - ecx=str, edx=type(1=sym,2=num,3=str,4=chr), ebx:eax=val, edi=hash
 movzx eax, byte [ecx]
 cmp eax, byte ' '
 je .sp
@@ -242,7 +250,6 @@ ret
 inc ecx
 jmp gnt
 .str:
-;puts "gnt: str", 10
 inc ecx			; first char of string
 mov ebx, 0		; string len
 .str1:
@@ -258,26 +265,20 @@ puts "gnt: no closing quote", 10
 mov edx, 0
 ret
 .strend:
-puts "gnt: str len "
-putr ebx
-puts 10
 mov eax, ecx		; eax=start of str
 add ecx, ebx
 inc ecx			; ecx=char after str
 mov edx, STR
 ret
 .dig:
-;puts "gnt: dig",10
 call atoi
 mov edx, NUM
 ret
 .let:
-;puts "gnt: let", 10
-call hash
+call hash		; populates edi
 mov edx, SYM
 ret
 .chr:
-;puts "gnt: chr", 10
 inc ecx
 mov edx, CHR
 ret

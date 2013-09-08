@@ -1,15 +1,16 @@
 struc ste
 .sym resd 1
+.typ resd 1
 .hi resd 1
 .lo resd 1
 endstruc
 
 section .text
 
-stfind: ; ebx=sym, esi=offs, zf=found, ecx=preserved
+stfind: ; edi{ebx}=sym, esi=offs, zf=found, ecx=preserved
 mov esi, 0
 .a:
-cmp [st+esi+ste.sym], ebx
+cmp [st+esi+ste.sym], edi
 je .end
 add esi, ste_size
 cmp esi, 64 * ste_size
@@ -18,27 +19,28 @@ cmp esi, 0 ; zf=0
 .end:
 ret
 
-stput: ; ebx=sym, edx:eax=val, ecx=preserved
+stput: ; edi{ebx}=sym, edx:ebx:eax=val, ecx=preserved
 call stfind
 je .f
-push ebx	; push orig sym
-mov ebx, 0
+push edi	; push orig sym
+mov edi, 0
 call stfind
-pop ebx		; pop orig sym
-mov [st+esi+ste.sym], ebx
+pop edi		; pop orig sym
+mov [st+esi+ste.sym], edi
 .f:
-mov [st+esi+ste.hi], edx
+mov [st+esi+ste.typ], edx
+mov [st+esi+ste.hi], ebx
 mov [st+esi+ste.lo], eax
 ret
 
-stget: ; ebx=sym, edx:eax=value, ecx=preserved
+stget: ; edi{ebx}=sym, edx:ebx:eax=value, ecx=preserved
 call stfind
 je .f
-mov eax, 0
 mov edx, 0
 ret
 .f:
-mov edx, [st+esi+ste.hi]
+mov edx, [st+esi+ste.typ]
+mov ebx, [st+esi+ste.hi]
 mov eax, [st+esi+ste.lo]
 ret
 

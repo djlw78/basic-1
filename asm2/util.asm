@@ -25,19 +25,19 @@
 
 section .text
 
-hash: ; ecx=str, ebx=hash, eax=trash
-xor ebx, ebx
+hash: ; ecx=str, edi{ebx}=hash, eax=trash
+mov edi, 0
 .a:
 movzx eax, byte [ecx]
 call islet
 jne .b
-rol ebx, 7
-add ebx, eax
+rol edi, 7
+add edi, eax
 inc ecx
 jmp .a
 .b:
 ;puts "hash "
-;putr ebx
+;putr edi
 ;puts 10
 ret
 
