@@ -15,6 +15,8 @@ global main
 main:
 puts "BASIC2", 10, 10
 
+mov [hn], dword heap		; init heap ptr
+
 mov ecx, sym.print
 call hash
 mov edx, FUN
@@ -35,7 +37,7 @@ call stput
 
 .a:
 puts ">"
-call read		; return ecx=str
+call reads		; return ecx=str
 call gnt
 cmp edx, 0
 je .a
@@ -102,14 +104,25 @@ basicprint: 		; PRINT {exp} [;]
 call gne
 cmp edx, NUM
 je .n
+cmp edx, STR
+je .s
 puts 10
 ret
-.n:
+.s: ; eax=str, ebx=len
+puts "_"
+push ecx
+mov ecx, eax
+mov edx, ebx
+call write
+pop ecx
+puts "_"
+jmp .a
+.n: ; eax=num
 push ecx
 mov ecx, buf
 call itoa
 mov ecx, buf
-call write
+call writes
 pop ecx
 jmp .a
 
@@ -211,7 +224,7 @@ call stget	; might be function...
 ret
 
 
-gnt: ; ecx = str, edx=type(1=sym,2=num,3=str,4=chr), eax=val, ebx=sym
+gnt: ; ecx=str, edx=type(1=sym,2=num,3=str,4=chr), eax=val, ebx=sym/strlen
 movzx eax, byte [ecx]
 cmp eax, byte ' '
 je .sp
@@ -229,27 +242,73 @@ ret
 inc ecx
 jmp gnt
 .str:
-puts "gnt: str", 10
-;TODO
-mov edx,3
+;puts "gnt: str", 10
+inc ecx			; first char of string
+mov ebx, 0		; string len
+.str1:
+movzx eax, byte [ecx+ebx]
+cmp eax, byte 0		; end of src
+je .strnul
+cmp eax, byte '"'	; end of str literal
+je .strend
+inc ebx			; ebx=str len FIXME gne doesn't preserve ebx
+jmp .str1
+.strnul:
+puts "gnt: no closing quote", 10
+mov edx, 0
+ret
+.strend:
+puts "gnt: str len "
+putr ebx
+puts 10
+mov eax, ecx		; eax=start of str
+add ecx, ebx
+inc ecx			; ecx=char after str
+mov edx, STR
 ret
 .dig:
-puts "gnt: dig",10
+;puts "gnt: dig",10
 call atoi
 mov edx, NUM
 ret
 .let:
-puts "gnt: let", 10
+;puts "gnt: let", 10
 call hash
 mov edx, SYM
 ret
 .chr:
-puts "gnt: chr", 10
+;puts "gnt: chr", 10
 inc ecx
 mov edx, CHR
 ret
 
+
+
+copy: ; ecx=src, eax=dest, ebx=size
+mov esi, 0
+.c1:
+cmp esi, ebx
+je .end
+movzx edx, byte [ecx+esi]
+mov [eax+esi], dl
+inc esi
+jmp .c1
+.end:
+ret
+
+new: ; ebx=size, eax=ptr, ecx=preserved
+mov eax, [hn]
+add [hn], ebx
+cmp dword [hn], heap + 10000h
+jge .of
+ret
+.of:
+puts "heap overflow", 10
+jmp exit
+
+
 section .data
+
 sym:
 .print:
 db "print",0
@@ -260,4 +319,6 @@ db "x",0
 
 section .bss
 
-buf: resb 256
+buf: resb 100h
+hn: resd 1
+heap: resb 10000h

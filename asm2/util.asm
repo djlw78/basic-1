@@ -1,6 +1,3 @@
-%define sys_write 4
-%define stdout 1
-
 %macro puts 1+
   section .data
   %%msg:
@@ -8,7 +5,7 @@
   section .text
   pusha
   mov ecx, %%msg
-  call write
+  call writes
   popa
 %endmacro
 
@@ -22,7 +19,7 @@
   mov ecx, %%msg
   call itoa
   mov ecx, %%msg
-  call write
+  call writes
   popa
 %endmacro
 
@@ -39,9 +36,9 @@ add ebx, eax
 inc ecx
 jmp .a
 .b:
-puts "hash "
-putr ebx
-puts 10
+;puts "hash "
+;putr ebx
+;puts 10
 ret
 
 islet:
@@ -110,26 +107,28 @@ jmp .a
 mov eax, ebx
 ret
 
-
-read: ; read from stdin - trashes eax, ebx, edx, return ecx = str
-mov eax, 3 ; sys_read
-mov ebx, 0 ; stdin
+reads: ; read str from stdin - ecx=str, eax=len
+mov eax, 3		; sys_read
+mov ebx, 0		; stdin
 mov ecx, readbuf
-mov edx, 255 ; len
+mov edx, 255		; max len
 int 80h
 dec eax
 mov [ecx+eax], byte 0
 ret
 
 exit:
-mov eax, 1
-mov ebx, 0
+mov eax, 1		; sys_exit
+mov ebx, 0		; exit status
 int 80h
 jmp exit
 
-write: ; write to stdout - eax ebx edx = *, ecx = str
+writes: ; ecx=str
 call strlen ; populates edx
-mov eax, 4 ; sys write
+jmp write
+
+write: ; write to stdout - ecx=str, edx=len
+mov eax, 4 ; sys_write
 mov ebx, 1 ; stdout
 int 80h
 ret
