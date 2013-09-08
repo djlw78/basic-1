@@ -37,10 +37,14 @@ call stput
 puts ">"
 call read		; return ecx=str
 call gnt
+cmp edx, 0
+je .a
 cmp edx, SYM
 je .s
 ; TODO define line
-puts "syntax error", 10
+puts "unexpected token "
+putr edx
+puts 10
 jmp .a
 
 .s:
@@ -58,23 +62,56 @@ jmp .a
 
 basiclet: ; LET sym = exp
 puts "LET", 10
-
+; x = 10
+call gnt
+cmp edx, SYM
+je .s
+puts "let: missing symbol", 10
+ret
+.s:
+push ebx		; push the symbol
+call gnt
+cmp edx, CHR
+je .c
+add esp, byte 4
+puts "let: missing =", 10
+ret
+.c:
+cmp eax, byte '='
+je .c2
+add esp, byte 4
+puts "let: not an =", 10
+ret
+.c2:
+call gne
+cmp edx, 0
+jne .e
+puts "let: missing expression", 10
+add esp, byte 4
+ret
+.e:
+pop ebx
+call stput		; associate symbol with value...
 ret
 
 
-
-basicprint: ; PRINT {exp} [;]
+basicprint: 		; PRINT {exp} [;]
 ; print x
 ; print x + 10
-puts "PRINT", 10
+.a:
 call gne
 cmp edx, NUM
 je .n
+puts 10
 ret
 .n:
-; TODO print number
-; print lf
-ret
+push ecx
+mov ecx, buf
+call itoa
+mov ecx, buf
+call write
+pop ecx
+jmp .a
 
 
 
@@ -101,7 +138,7 @@ push eax		; push the chr
 call gne
 cmp edx, 0
 jne .d
-puts "missing expression", 10
+puts "gne: missing expression", 10
 add esp, byte 16
 mov edx, 0
 ret
@@ -110,34 +147,67 @@ pop ebp			; pop chr
 add esp, byte 4		; skip str
 pop esi			; pop orig eax
 pop edi			; pop orig edx
-; combine edx:eax = edx:eax ebp edi:esi
-cmp edx, edi
-je .e
-puts "expression type mismatch "
-putr edx
-puts " and "
-putr edi
-puts 10
+; ---- evaluate edx:eax = edx:eax ebp edi:esi ----
+cmp edi, NUM
+je .n
+puts "gne: bad expression", 10
 mov edx, 0
 ret
-.e:
-; TODO operators
+.n:
+cmp edx, NUM
+je .n2
+puts "gne: bad numeric expression", 10
+mov edx, 0
+ret
+.n2:
 mov edx, NUM
+cmp ebp, byte '+'
+je .nadd
+cmp ebp, byte '-'
+je .nsub
+cmp ebp, byte '='
+je .neq
+cmp ebp, byte '*'
+je .nmul
+puts "gne: bad numeric operator", 10
+mov edx, 0
+ret
+.nadd:
 add eax, esi
+ret
+.nsub:
+sub esi, eax
+mov eax, esi
+ret
+.neq:
+; could use a boolean type...
+cmp eax, esi
+je .neqe
+mov eax, 0
+ret
+.neqe:
+mov eax, 1
+ret
+.nmul:
+imul eax, esi
 ret
 
 
 gnv: ; ecx=str, edx=type(2=num,3=str) eax=value
 ; val = num | str | sym | (exp)
 call gnt
-cmp edx, 1
-jne .b
-call stget	; might be function...
-ret
-.b:
-puts "unexpected value", 10
+cmp edx, SYM
+je .s
+cmp edx, byte NUM
+je .end
+cmp edx, byte STR
+je .end
+; TODO exp
 mov edx, 0
-;TODO exp
+ret
+.s:
+call stget	; might be function...
+.end:
 ret
 
 
@@ -153,29 +223,29 @@ call islet
 je .let
 test eax, 7fh
 jnz .chr
-puts "nul", 10
+mov edx, 0		; invalid char, end of line
 ret
 .sp:
-puts "sp", 10
 inc ecx
 jmp gnt
 .str:
-puts "str", 10
+puts "gnt: str", 10
 ;TODO
 mov edx,3
 ret
 .dig:
-puts "dig",10
+puts "gnt: dig",10
 call atoi
 mov edx, NUM
 ret
 .let:
-puts "let", 10
+puts "gnt: let", 10
 call hash
 mov edx, SYM
 ret
 .chr:
-puts "chr", 10
+puts "gnt: chr", 10
+inc ecx
 mov edx, CHR
 ret
 
