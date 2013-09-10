@@ -1,13 +1,15 @@
-struc ste
-.sym resd 1
-.typ resd 1
-.hi resd 1
-.lo resd 1
-endstruc
+section .data
+
+st:
+%rep 64
+istruc ste
+at ste.sym, dd 0
+iend
+%endrep
 
 section .text
 
-stfind: ; edi{ebx}=sym, esi=offs, zf=found, ecx=preserved
+stfind: ; edi=sym, esi=offs, zf=found, ecx=preserved
 mov esi, 0
 .a:
 cmp [st+esi+ste.sym], edi
@@ -19,7 +21,7 @@ cmp esi, 0 ; zf=0
 .end:
 ret
 
-stput: ; edi{ebx}=sym, edx:ebx:eax=val, ecx=preserved
+stput: ; edi=sym, edx:ebx:eax=val, ecx=preserved
 call stfind
 je .f
 push edi	; push orig sym
@@ -43,12 +45,3 @@ mov edx, [st+esi+ste.typ]
 mov ebx, [st+esi+ste.hi]
 mov eax, [st+esi+ste.lo]
 ret
-
-section .data
-
-st:
-%rep 64
-istruc ste
-at ste.sym, dd 0
-iend
-%endrep
