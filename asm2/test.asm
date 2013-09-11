@@ -2,7 +2,8 @@
 ; nasm -f elf test.asm && gcc test.o && ./a.out
 
 %include "util.asm"
-%include "st.asm"
+%include "dict.asm"
+
 %define SYM 1
 %define NUM 2
 %define STR 3
@@ -17,26 +18,25 @@ main:
 puts "BASIC2", 10, 10
 
 mov [hn], dword heap		; init heap ptr
+mov [sdict], dword 0
 
 mov ecx, sym.print
 call hash
 mov edx, FUN
 mov eax, basicprint
-call stput
+call sput
 
 mov ecx, sym.let
 call hash
 mov edx, FUN
 mov eax, basiclet
-call stput
+call sput
 
 mov ecx, sym.x
 call hash
 mov edx, NUM
 mov eax, 123
-call stput
-
-; TODO dump st, heap info command
+call sput
 
 prompt:
 puts ">"
@@ -52,7 +52,7 @@ putr edx
 puts 10
 jmp prompt
 .sym:
-call stget		; populates edx:ebx:eax
+call sget		; populates edx:ebx:eax
 cmp edx, FUN
 je .sym2
 ; TODO call let
@@ -94,7 +94,7 @@ add esp, byte 4
 ret
 .e:
 pop edi
-call stput		; associate symbol with value...
+call sput		; associate symbol with value...
 ret
 
 
@@ -158,7 +158,7 @@ mov edx, 0
 ret
 .d:
 mov [esp+16],ecx	; update str ptr on stack - bit of a hack
-pop ecx			; pop chr 
+pop ecx			; pop chr
 pop esi			; pop orig lo val
 pop ebp			; pop orig hi val
 pop edi			; pop orig type
@@ -227,7 +227,7 @@ je .end
 mov edx, 0
 ret
 .s:
-call stget	; might be function...
+call sget		; might be function...
 .end:
 ret
 

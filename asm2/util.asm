@@ -3,10 +3,12 @@
   %%msg:
   db %1, 0
   section .text
+  pushf
   pusha
   mov ecx, %%msg
   call writes
   popa
+  popf
 %endmacro
 
 %macro putr 1
@@ -14,6 +16,7 @@
   %%msg:
   resb 16
   section .text
+  pushf
   pusha
   mov eax, %1
   mov ecx, %%msg
@@ -21,11 +24,12 @@
   mov ecx, %%msg
   call writes
   popa
+  popf
 %endmacro
 
 section .text
 
-hash: ; ecx=str, edi{ebx}=hash, eax=trash
+hash: ; ecx=str, edi=hash, ebp=preserved
 mov edi, 0
 .a:
 movzx eax, byte [ecx]
@@ -36,9 +40,9 @@ add edi, eax
 inc ecx
 jmp .a
 .b:
-;puts "hash "
-;putr edi
-;puts 10
+puts "hash "
+putr edi
+puts 10
 ret
 
 islet:
