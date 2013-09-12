@@ -19,19 +19,12 @@ times DSIZE resd 4
 section .text
 
 dfind:			; ebp=table, edi=sym, zf=found, ebx=ptr
-puts "dfind", 10
+puts "dfind "
+putr edi
+puts 10
 mov eax, 0		; eax=low
 mov edx, [ebp]		; edx=high
 dec edx
-;test edx, edx
-;puts "dfind high "
-;putr edx
-;puts 10
-;jnz .a
-;lea ebx, [ebp+4]	; ebx=insert ptr
-;test esp, esp		; clear zf
-;puts "dfind nf0", 10
-;ret			; RET zf=0, ebx=insert ptr, eax=insert index
 .a:
 puts "dfind high "
 putr edx
@@ -81,10 +74,20 @@ dget:			; ebp=table, edi=sym, edx:ebx:eax=val
 call dfind
 jne .nf
 mov edx, [ebx+4]
-mov ebx, [ebx+8]
 mov eax, [ebx+12]
+mov ebx, [ebx+8]
+puts "dget f "
+putr edi
+puts ":"
+putr edx
+puts ":"
+putr ebx
+puts ":"
+putr eax
+puts 10
 ret
 .nf:
+puts "dget nf", 10
 mov edx, 0
 mov ebx, 0
 mov eax, 0
@@ -109,7 +112,7 @@ mov edx, [ebp]
 sub edx, eax
 shl edx, 2		; edx=dwords to copy
 mov eax, edx
-call copyd
+call copydb
 inc dword [ebp]		; increase size
 puts "dput sz now "
 putr [ebp]
@@ -120,12 +123,41 @@ pop dword [ebx]
 pop dword [ebx+4]
 pop dword [ebx+8]
 pop dword [ebx+12]
+puts "dput pop "
+putr [ebx]
+puts ":"
+putr [ebx+4]
+puts ":"
+putr [ebx+8]
+puts ":"
+putr [ebx+12]
+puts 10
 ret
 .ov:
 puts "dput: overflow", 10
 jmp exit
 
-copyd:			; esi=src,edi=dest,eax=count,ebx=preserved
+copydb:			; esi=src,edi=dest,eax=count,ebx=preserved
+puts "copyd "
+putr eax
+puts 10
+shl eax, 2
+.a:
+test eax, eax
+je .end
+sub eax, byte 4
+puts "copyd a "
+putr eax
+puts " "
+putr [esi+eax]
+puts 10
+mov edx, [esi+eax]
+mov [edi+eax], edx
+jmp .a
+.end:
+ret
+
+copydf:			; esi=src,edi=dest,eax=count,ebx=preserved
 puts "copyd "
 putr eax
 puts 10

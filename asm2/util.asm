@@ -1,4 +1,5 @@
 %macro puts 1+
+%ifdef D
   section .data
   %%msg:
   db %1, 0
@@ -9,9 +10,11 @@
   call writes
   popa
   popf
+%endif
 %endmacro
 
 %macro putr 1
+%ifdef D
   section .bss
   %%msg:
   resb 16
@@ -25,6 +28,7 @@
   call writes
   popa
   popf
+%endif
 %endmacro
 
 section .text
