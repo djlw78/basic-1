@@ -40,10 +40,7 @@
 
 section .bss
 
-readbuf:
-resb 256
-putrbuf:
-resb 16
+putrbuf: resb 16
 
 section .text
 
@@ -81,7 +78,7 @@ cmp eax, eax ; zf=1
 .end:
 ret
 
-itoa: ; ecx <= str, eax <= num, ecx => after str
+itoa: ; ecx=str, eax=num, ecx=after str
 cmp eax, 0
 jne .a
 mov [ecx], byte '0'	;special case for 0
@@ -113,7 +110,7 @@ jmp .b
 mov [ecx], byte 0
 ret
 
-atoi: ; ecx <= str, eax => val
+atoi: ; ecx=str, eax=val
 mov eax, 0
 mov ebx, 0
 .a:
@@ -129,10 +126,9 @@ jmp .a
 mov eax, ebx
 ret
 
-reads: ; read str from stdin - ecx=str, eax=len
+reads: ; ecx=str, eax=len
 mov eax, 3		; sys_read
 mov ebx, 0		; stdin
-mov ecx, readbuf
 mov edx, 255		; max len
 int 80h
 dec eax
@@ -147,8 +143,6 @@ jmp exit
 
 writes: ; ecx=str
 call strlen ; populates edx
-jmp write
-
 write: ; write to stdout - ecx=str, edx=len
 mov eax, 4 ; sys_write
 mov ebx, 1 ; stdout

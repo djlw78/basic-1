@@ -1,4 +1,4 @@
-; example assembly program
+; headache inducing basic interpreter
 ; nasm -f elf test.asm && ld test.o && ./a.out
 
 %include "util.asm"
@@ -12,17 +12,18 @@
 
 section .data
 
-str:
-.print:
-db "print",0
-.let:
-db "let",0
-.x:
-db "x",0
+str: db "!",0
+.print: db "print",0
+.let: db "let",0
+.input: db "input",0
+.x: db "x",0
 
 section .bss
 
-buf: resb 100h
+buf: db "!", 0
+.input: resb 100h
+.print: resb 100h
+.prompt: resb 100h
 hn: resd 1
 heap: resb 10000h
 
@@ -57,9 +58,17 @@ mov ebx, 0
 mov eax, 123
 call sput
 
+mov ecx, str.input
+call hash
+mov edx, FUN
+mov ebx, 0
+mov eax, basicinput
+call sput
+
 prompt:
 puts ">"
-call reads		; return ecx=str
+mov ecx, buf.prompt
+call reads
 call gnt		; populates edi:edx:ebx:eax
 cmp edx, 0
 je prompt
@@ -90,8 +99,19 @@ basicinput: ; INPUT sym
 call gnt
 cmp edx, SYM
 je .s
+puts "input: expected symbol", 10
+ret
 .s:
-; TODO
+push edi
+puts "? "
+mov ecx, buf.input
+call reads
+call atoi
+pop edi
+mov edx, NUM
+mov ebx, 0
+call sput
+ret
 
 basiclet: ; LET sym = exp
 ; let x = 10
@@ -148,9 +168,9 @@ pop ecx
 jmp .a
 .num: ; eax=num
 push ecx
-mov ecx, buf
+mov ecx, buf.print
 call itoa
-mov ecx, buf
+mov ecx, buf.print
 call writes
 pop ecx
 jmp .a
@@ -194,6 +214,13 @@ pop ecx			; pop chr
 pop esi			; pop orig lo val
 pop ebp			; pop orig hi val
 pop edi			; pop orig type
+dputs "gne eval "
+dputr esi
+dputs " <"
+dputr ecx
+dputs "> "
+dputr eax
+dputs 10
 ; [esp]=ecx
 ; ---- evaluate edx:ebx:eax = edi:ebp:esi *ecx* edx:ebx:eax ----
 cmp edi, NUM
@@ -241,9 +268,13 @@ jmp .end
 mov eax, 1
 jmp .end
 .nmul:
+dputs "gne.nmul", 10
 imul eax, esi
 .end:
 pop ecx			; overwrite op with str ptr
+dputs "gne: eval ret "
+dputr eax
+dputs 10
 ret
 
 
