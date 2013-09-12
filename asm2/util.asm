@@ -1,35 +1,49 @@
 %macro puts 1+
-%ifdef D
   section .data
   %%msg:
-  db %1, 0
+  db %1
+  %%msgl:
+  dd $-%%msg
   section .text
-  pushf
   pusha
   mov ecx, %%msg
-  call writes
+  mov edx, dword [%%msgl]
+  call write
   popa
+%endmacro
+
+%macro dputs 1+
+%ifdef D
+  pushf
+  puts %1
   popf
 %endif
 %endmacro
 
 %macro putr 1
-%ifdef D
-  section .bss
-  %%msg:
-  resb 16
-  section .text
-  pushf
   pusha
   mov eax, %1
-  mov ecx, %%msg
+  mov ecx, putrbuf
   call itoa
-  mov ecx, %%msg
+  mov ecx, putrbuf
   call writes
   popa
+%endmacro
+
+%macro dputr 1
+%ifdef D
+  pushf
+  putr %1
   popf
 %endif
 %endmacro
+
+section .bss
+
+readbuf:
+resb 256
+putrbuf:
+resb 16
 
 section .text
 
@@ -44,9 +58,9 @@ add edi, eax
 inc ecx
 jmp .a
 .b:
-puts "hash "
-putr edi
-puts 10
+dputs "hash "
+dputr edi
+dputs 10
 ret
 
 islet:
@@ -153,5 +167,3 @@ jmp .a
 sub edx, ecx
 ret
 
-section .bss
-readbuf: resb 256

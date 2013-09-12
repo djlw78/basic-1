@@ -1,5 +1,5 @@
 ; example assembly program
-; nasm -f elf test.asm && gcc test.o && ./a.out
+; nasm -f elf test.asm && ld test.o && ./a.out
 
 %include "util.asm"
 %include "dict.asm"
@@ -12,43 +12,45 @@
 
 section .data
 
-titlemsg: 
-db "BASIC2", 10, 10, 0
-promptmsg:
-db ">", 0
-nlmsg:
-db 10, 0
+str:
+.print:
+db "print",0
+.let:
+db "let",0
+.x:
+db "x",0
+
+section .bss
+
+buf: resb 100h
+hn: resd 1
+heap: resb 10000h
 
 section .text
 
-global main
+global _start
 
-main:
-mov ecx, titlemsg
-call writes
+_start:
+puts "BASIC2", 10, 10
 
 mov [hn], dword heap		; init heap ptr
 mov [sdict], dword 0
 
-puts "basicprint at "
-putr basicprint
-puts 10
-
-mov ecx, sym.print
+mov ecx, str.print
 call hash
 mov edx, FUN
 mov ebx, 0
 mov eax, basicprint
 call sput
 
-mov ecx, sym.let
+mov ecx, str.let
 call hash
 mov edx, FUN
 mov ebx, 0
 mov eax, basiclet
 call sput
 
-mov ecx, sym.x
+mov ecx, str.x
 call hash
 mov edx, NUM
 mov ebx, 0
@@ -56,9 +58,7 @@ mov eax, 123
 call sput
 
 prompt:
-;puts ">"
-mov ecx, promptmsg
-call writes
+puts ">"
 call reads		; return ecx=str
 call gnt		; populates edi:edx:ebx:eax
 cmp edx, 0
@@ -80,13 +80,18 @@ je .sym2
 puts "unknown symbol", 10
 jmp prompt
 .sym2:
-puts "pr cmd "
-putr eax
-puts 10
+dputs "pr cmd "
+dputr eax
+dputs 10
 call eax		; call the basic command...
 jmp prompt
 
-
+basicinput: ; INPUT sym
+call gnt
+cmp edx, SYM
+je .s
+.s:
+; TODO
 
 basiclet: ; LET sym = exp
 ; let x = 10
@@ -123,7 +128,7 @@ ret
 
 
 basicprint: 		; PRINT {exp} [;]
-puts "basicprint",10
+dputs "basicprint",10
 ; print x
 ; print x + 10
 .a:
@@ -132,8 +137,7 @@ cmp edx, NUM
 je .num
 cmp edx, STR
 je .str
-mov ecx, nlmsg
-call writes
+puts 10
 ret
 .str: ; eax=str, ebx=len
 push ecx
@@ -155,7 +159,7 @@ jmp .a
 
 
 gne: ; get next expression - ecx=str, edx=type(2=num,3=str), ebx:eax=val
-puts "gne", 10
+dputs "gne", 10
 ; exp = val [chr exp]
 call gnv
 cmp edx, 0
@@ -175,7 +179,7 @@ pop edx			; pop type
 pop ecx			; pop str
 ret			; return, no expression, just a value
 .c:
-puts "gne chr", 10
+dputs "gne chr", 10
 push eax		; push the chr
 call gne		; populates edx:ebx:eax...
 cmp edx, 0
@@ -199,7 +203,7 @@ add esp, byte 4
 mov edx, 0
 ret
 .num:
-puts "gne num", 10
+dputs "gne num", 10
 cmp edx, NUM
 je .num2
 puts "gne: bad numeric expression", 10
@@ -245,7 +249,7 @@ ret
 
 gnv: ; get next value - ecx=str, edx=type(2=num,3=str) ebx:eax=value
 ; val = num | str | sym | (exp)
-puts "gnv", 10
+dputs "gnv", 10
 call gnt
 cmp edx, SYM
 je .s
@@ -265,7 +269,7 @@ ret
 
 
 gnt: ; get next token - ecx=str, edx=type(1=sym,2=num,3=str,4=chr), ebx:eax=val, edi=hash
-puts "gnt", 10
+dputs "gnt", 10
 movzx eax, byte [ecx]
 cmp eax, byte ' '
 je .sp
@@ -278,13 +282,13 @@ je .let
 test eax, 7fh
 jnz .chr
 mov edx, 0		; invalid char, end of line
-puts "gnt: nul", 10
+dputs "gnt: nul", 10
 ret
 .sp:
 inc ecx
 jmp gnt
 .str:
-puts "gnt: str", 10
+dputs "gnt: str", 10
 inc ecx			; first char of string
 mov ebx, 0		; string len
 .str1:
@@ -306,12 +310,12 @@ inc ecx			; ecx=char after str
 mov edx, STR
 ret
 .dig:
-puts "gnt: dig", 10
+dputs "gnt: dig", 10
 call atoi
 mov edx, NUM
 ret
 .let:
-puts "gnt: let", 10
+dputs "gnt: let", 10
 call hash		; populates edi
 mov edx, SYM
 ret
@@ -345,18 +349,3 @@ puts "heap overflow", 10
 jmp exit
 
 
-section .data
-
-sym:
-.print:
-db "print",0
-.let:
-db "let",0
-.x:
-db "x",0
-
-section .bss
-
-buf: resb 100h
-hn: resd 1
-heap: resb 10000h

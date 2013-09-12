@@ -19,44 +19,44 @@ times DSIZE resd 4
 section .text
 
 dfind:			; ebp=table, edi=sym, zf=found, ebx=ptr
-puts "dfind "
-putr edi
-puts 10
+dputs "dfind "
+dputr edi
+dputs 10
 mov eax, 0		; eax=low
 mov edx, [ebp]		; edx=high
 dec edx
 .a:
-puts "dfind high "
-putr edx
-puts " low "
-putr eax
-puts 10
+dputs "dfind high "
+dputr edx
+dputs " low "
+dputr eax
+dputs 10
 cmp eax, edx		; low - high
 jg .nf
 mov ecx, eax
 add ecx, edx		; ecx=low+high
 shr ecx, 1		; ecx=mid
-puts "dfind mid "
-putr ecx
-puts 10
+dputs "dfind mid "
+dputr ecx
+dputs 10
 mov ebx, ecx
 shl ebx, 4
 lea ebx, [ebp+ebx+4]	; ebx=mid ptr
-puts "dfind [mid] "
-putr [ebx]
-puts 10
+dputs "dfind [mid] "
+dputr [ebx]
+dputs 10
 cmp [ebx], edi
 jl .l
 jg .g
-puts "dfind f", 10
+dputs "dfind f", 10
 ret			; ret ZF=1, ebx=found ptr, ecx=found index
 .l:
-puts "dfind l", 10
+dputs "dfind l", 10
 mov eax, ecx
 inc eax			; low=mid+1
 jmp .a
 .g:
-puts "dfind g", 10
+dputs "dfind g", 10
 mov edx, ecx
 dec edx			; high=mid-1
 jmp .a
@@ -64,7 +64,7 @@ jmp .a
 mov ebx, eax
 shl ebx, 4		; ebx=low (insert offs)
 lea ebx, [ebp+4+ebx]	; ebx=insert ptr
-puts "dfind nf", 10
+dputs "dfind nf", 10
 test esp, esp
 ret			; ret ZF=0, ebx=insert ptr, eax=insert index
 
@@ -76,25 +76,25 @@ jne .nf
 mov edx, [ebx+4]
 mov eax, [ebx+12]
 mov ebx, [ebx+8]
-puts "dget f "
-putr edi
-puts ":"
-putr edx
-puts ":"
-putr ebx
-puts ":"
-putr eax
-puts 10
+dputs "dget f "
+dputr edi
+dputs ":"
+dputr edx
+dputs ":"
+dputr ebx
+dputs ":"
+dputr eax
+dputs 10
 ret
 .nf:
-puts "dget nf", 10
+dputs "dget nf", 10
 mov edx, 0
 mov ebx, 0
 mov eax, 0
 ret
 
 sput:
-puts "sput", 10
+dputs "sput", 10
 mov ebp, sdict
 dput:			; ebp=table, edi=sym, edx:ebx:eax=val
 push eax
@@ -103,7 +103,7 @@ push edx
 push edi
 call dfind		; returns ebx=offs, eax=index
 je .f
-puts "dput add", 10
+dputs "dput add", 10
 cmp [ebp], dword DSIZE
 jge .ov
 mov esi, ebx
@@ -114,43 +114,43 @@ shl edx, 2		; edx=dwords to copy
 mov eax, edx
 call copydb
 inc dword [ebp]		; increase size
-puts "dput sz now "
-putr [ebp]
-puts 10
+dputs "dput sz now "
+dputr [ebp]
+dputs 10
 .f:
-puts "dput f", 10
+dputs "dput f", 10
 pop dword [ebx]
 pop dword [ebx+4]
 pop dword [ebx+8]
 pop dword [ebx+12]
-puts "dput pop "
-putr [ebx]
-puts ":"
-putr [ebx+4]
-puts ":"
-putr [ebx+8]
-puts ":"
-putr [ebx+12]
-puts 10
+dputs "dput pop "
+dputr [ebx]
+dputs ":"
+dputr [ebx+4]
+dputs ":"
+dputr [ebx+8]
+dputs ":"
+dputr [ebx+12]
+dputs 10
 ret
 .ov:
-puts "dput: overflow", 10
+dputs "dput: overflow", 10
 jmp exit
 
 copydb:			; esi=src,edi=dest,eax=count,ebx=preserved
-puts "copyd "
-putr eax
-puts 10
+dputs "copyd "
+dputr eax
+dputs 10
 shl eax, 2
 .a:
 test eax, eax
 je .end
 sub eax, byte 4
-puts "copyd a "
-putr eax
-puts " "
-putr [esi+eax]
-puts 10
+dputs "copyd a "
+dputr eax
+dputs " "
+dputr [esi+eax]
+dputs 10
 mov edx, [esi+eax]
 mov [edi+eax], edx
 jmp .a
@@ -158,19 +158,19 @@ jmp .a
 ret
 
 copydf:			; esi=src,edi=dest,eax=count,ebx=preserved
-puts "copyd "
-putr eax
-puts 10
+dputs "copyd "
+dputr eax
+dputs 10
 mov ecx, 0		; FIXME copy backwards not forwards...
 shl eax, 2
 .a:
 cmp ecx, eax
 je .end
-puts "copyd a "
-putr ecx
-puts " "
-putr [esi+ecx]
-puts 10
+dputs "copyd a "
+dputr ecx
+dputs " "
+dputr [esi+ecx]
+dputs 10
 mov edx, [esi+ecx]
 mov [edi+ecx], edx
 add ecx, byte 4
