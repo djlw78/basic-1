@@ -20,7 +20,7 @@ str: db "!",0
 
 section .bss
 
-buf: db "!", 0
+buf: resb 2
 .input: resb 100h
 .print: resb 100h
 .prompt: resb 100h
@@ -34,6 +34,7 @@ global _start
 _start:
 puts "BASIC2", 10, 10
 
+mov [buf], byte '!'
 mov [hn], dword heap		; init heap ptr
 mov [sdict], dword 0
 
