@@ -54,10 +54,11 @@ void tput(tab *t, hash_t k, val v);
 val tget(tab *t, hash_t k);
 hash_t hash(char **s);
 hash_t hashs(char *s);
-val ie(ival i1, ival i2, char c);
+val ei(ival i1, ival i2, char c);
 val gne (char **s);
 val gnv (char **s);
 void Print(char **s);
+void Let(char **s);
 
 char buf[256];
 tab st;
@@ -65,6 +66,7 @@ tab st;
 int main() {
  printf("BASIC3\n\n");
  tput(&st, hashs("print"), funv(Print));
+ tput(&st, hashs("let"), funv(Let));
  while (1) {
   printf(">");
   fflush(stdout);
@@ -72,11 +74,13 @@ int main() {
   char *s = buf;
   val v;
   while ((v = gnt(&s)).t != 0) {
-   printf("%d\n", v.t);
    if (v.t == SYM) {
     val v2 = tget(&st, v.uv.hv.h);
     if (v2.t == FUN) {
      v2.uv.fv.f(&s);
+    } else {
+     s = buf;
+     Let(&s);
     }
    }
   }
@@ -84,14 +88,35 @@ int main() {
  return 0;
 }
 
-void Print(char **s) {
- printf("PRINT\n");
+void Let (char **s) {
+ val v = gnt(s);
+ if (v.t != SYM) {
+  printf("let: symbol expected\n");
+  return;
+ }
+ val v2 = gnt(s);
+ if (v2.t != CHR || v2.uv.cv.c != '=') {
+  printf("let: assignment expected\n");
+  return;
+ }
+ val v3 = gne(s);
+ if (v3.t == 0) {
+  printf("let: expression expected\n");
+  return;
+ }
+ tput(&st, v.uv.hv.h, v3);
+}
+
+void Print (char **s) {
  val v;
  while ((v = gne(s)).t != 0) {
   switch (v.t) {
    case INT: printf("%" PRId64, v.uv.iv.i); break;
+   case STR: for (int n = 0; n < v.uv.sv.l; n++) fputc(v.uv.sv.s[n], stdout); break;
+   case FUN: printf("%p", v.uv.fv.f); break;
    default: printf("<%d>", v.t);
   }
+  fputc(' ', stdout);
  }
  printf("\n");
 }
@@ -111,12 +136,12 @@ val gne (char **s) {
   return nulv();
  }
  if (v.t == INT && v2.t == INT)
-  return ie(v.uv.iv, v2.uv.iv, c.uv.cv.c);
+  return ei(v.uv.iv, v2.uv.iv, c.uv.cv.c);
  printf("gne: bad types in exp\n");
  return nulv();
 }
 
-val ie(ival i1, ival i2, char c) {
+val ei(ival i1, ival i2, char c) {
  int64_t i;
  switch (c) {
   case '+': i = i1.i + i2.i; break;
@@ -172,14 +197,15 @@ hash_t hash(char **s) {
 }
 
 val gs(char **s) {
- char *s1 = *s++;
+ char *s1 = ++(*s);
  size_t l = 0;
- while (**s != '"') {
-  if (**s == 0)
-    return nulv();
+ char c;
+ while ((c = *(*s)++)) {
+  if (c == '"')
+   return strv(s1, l);
   l++;
  }
- return strv(s1, l);
+ return nulv();
 }
 
 int mnt(char **s) {
