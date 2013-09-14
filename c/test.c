@@ -2,27 +2,61 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <inttypes.h>
 
 #define SYM 1
-#define NUM 2
+#define INT 2
 #define STR 3
 #define CHR 4
 #define FUN 5
-#define VAL(a,b,c) (val){a,b,c}
-#define NVAL VAL(0,0,0)
-#define ENT(a,b) (ent){a,b}
 
-typedef struct { int t; int h; int l; } val;
-typedef struct { int k; val v; } ent;
-typedef struct { int s; ent t[256]; } tab;
+typedef uint32_t hash_t;
+typedef struct { char c; } cval;
+typedef struct { int64_t i; } ival;
+typedef struct { double d; } dval;
+typedef struct { char *s; size_t l; } sval;
+typedef struct { void (*f)(char **); } fval;
+typedef struct { hash_t h; } hval;
+typedef union { ival iv; dval dv; sval sv; fval fv; hval hv; cval cv; } uval;
+typedef struct { int t; uval uv; } val;
+typedef struct { hash_t k; val v; } ent;
+typedef struct { size_t s; ent t[256]; } tab;
+
+val chrv (char c) {
+ val v; v.t = CHR; v.uv.cv.c = c; return v;
+}
+
+val funv (void (*f)(char **)) {
+ val v; v.t = FUN; v.uv.fv.f = f; return v;
+}
+
+val nulv () {
+ val v; v.t = 0; return v;
+}
+  
+val strv (char *s, size_t l) {
+ val v; v.t = STR; v.uv.sv.s = s; v.uv.sv.l = l; return v;
+}
+
+val intv (int64_t i) {
+ val v; v.t = INT; v.uv.iv.i = i; return v;
+}
+
+val hashv (hash_t h) {
+ val v; v.t = SYM; v.uv.hv.h = h; return v;
+}
+
 typedef void(*F)(char **);
 int mnt(char **s);
 val gnt(char **s);
 val gs(char **s);
-void tput(tab *t, int k, val v);
-val tget(tab *t, int k);
-int hash(char **s);
-int hashs(char *s);
+void tput(tab *t, hash_t k, val v);
+val tget(tab *t, hash_t k);
+hash_t hash(char **s);
+hash_t hashs(char *s);
+val ie(ival i1, ival i2, char c);
+val gne (char **s);
+val gnv (char **s);
 void Print(char **s);
 
 char buf[256];
@@ -30,7 +64,7 @@ tab st;
 
 int main() {
  printf("BASIC3\n\n");
- tput(&st, hashs("print"), VAL(FUN, 0, (int)Print));
+ tput(&st, hashs("print"), funv(Print));
  while (1) {
   printf(">");
   fflush(stdout);
@@ -38,13 +72,11 @@ int main() {
   char *s = buf;
   val v;
   while ((v = gnt(&s)).t != 0) {
-   printf("%d %d %d\n", v.t, v.h, v.l);
+   printf("%d\n", v.t);
    if (v.t == SYM) {
-    val v2 = tget(&st, v.l);
-    printf("=> %d %d %d\n", v2.t, v2.h, v2.l);
+    val v2 = tget(&st, v.uv.hv.h);
     if (v2.t == FUN) {
-     F f = (F) v2.l;
-     f(&s);
+     v2.uv.fv.f(&s);
     }
    }
   }
@@ -53,28 +85,86 @@ int main() {
 }
 
 void Print(char **s) {
-  printf("PRINT\n");
+ printf("PRINT\n");
+ val v;
+ while ((v = gne(s)).t != 0) {
+  switch (v.t) {
+   case INT: printf("%" PRId64, v.uv.iv.i); break;
+   default: printf("<%d>", v.t);
+  }
+ }
+ printf("\n");
 }
 
-val gnt(char **s) {
- // (NUM,n) (SYM,h) (CHR,c) (STRL,s,e)
+val gne (char **s) {
+ // exp = val [chr exp]
+ val v = gnv(s);
+ if (v.t == 0)
+  return v;
+ int t = mnt(s);
+ if (t != CHR)
+  return v;
+ val c = gnt(s);
+ val v2 = gne(s);
+ if (v2.t == 0) {
+  printf("gne: bad exp\n");
+  return nulv();
+ }
+ if (v.t == INT && v2.t == INT)
+  return ie(v.uv.iv, v2.uv.iv, c.uv.cv.c);
+ printf("gne: bad types in exp\n");
+ return nulv();
+}
+
+val ie(ival i1, ival i2, char c) {
+ int64_t i;
+ switch (c) {
+  case '+': i = i1.i + i2.i; break;
+  case '-': i = i1.i - i2.i; break;
+  case '*': i = i1.i * i2.i; break;
+  case '/': i = i1.i / i2.i; break;
+  case '|': i = i1.i | i1.i; break;
+  case '&': i = i1.i & i2.i; break;
+  case '%': i = i1.i % i2.i; break;
+  case '^': i = i1.i ^ i2.i; break;
+  default: printf("ie: unknown op %c\n", c); return nulv();
+ }
+ return intv(i);
+}
+
+val gnv (char **s) {
+ // val = int | str | sym | ( exp )
+ val v = gnt(s);
+ switch (v.t) {
+  case 0:
+  case INT:
+  case STR:
+   return v;
+  case SYM:
+   return tget(&st, v.uv.hv.h);
+ }
+ printf("gnv: unknown type %d\n", v.t);
+ return nulv();
+}
+
+val gnt (char **s) {
  int t = mnt(s);
  switch (t) {
-  case SYM: return VAL(SYM, 0, hash(s));
-  case NUM: return VAL(NUM, 0, strtol(*s, s, 10));
-  case CHR: return VAL(CHR, 0, *(*s)++);
+  case SYM: return hashv(hash(s));
+  case INT: return intv(strtol(*s, s, 10));
+  case CHR: return chrv(*(*s)++);
   case STR: return gs(s);
-  default: return NVAL;
+  default: return nulv();
  }
 }
 
-int hashs(char *s) {
+hash_t hashs(char *s) {
  return hash(&s);
 }
 
-int hash(char **s) {
- uint32_t h = 0;
- while (isalpha(**s)) {
+hash_t hash(char **s) {
+ hash_t h = 0;
+ while (isalnum(**s)) {
   h = ((h << 7) | **s) | (h >> 25);
   (*s)++;
  }
@@ -83,27 +173,27 @@ int hash(char **s) {
 
 val gs(char **s) {
  char *s1 = *s++;
- int l = 0;
+ size_t l = 0;
  while (**s != '"') {
   if (**s == 0)
-    return NVAL;
+    return nulv();
   l++;
  }
- return VAL(STR, (int) s1, l);
+ return strv(s1, l);
 }
 
 int mnt(char **s) {
-while (isspace(**s))
+ while (isspace(**s))
   (*s)++;
-if (**s == 0)
+ if (**s == 0)
   return 0;
-if (**s == '"')
+ if (**s == '"')
   return STR;
-if (**s >= '0' && **s <= '9')
-  return NUM;
-if (**s >= 'a' && **s <= 'z')
+ if (isdigit(**s))
+  return INT;
+ if (isalpha(**s))
   return SYM;
-return CHR;
+ return CHR;
 }
 
 int cmp1(int *k, ent *e) {
@@ -116,16 +206,16 @@ int cmp(const void *k, const void *e) {
  return (*k2) - e2->k;
 }
 
-ent *tfind(tab *t, int k) {
+ent *tfind(tab *t, hash_t k) {
  return bsearch(&k, &t->t, t->s, sizeof (ent), cmp);
 }
 
-val tget(tab *t, int k) {
+val tget(tab *t, hash_t k) {
  ent *e = tfind(t, k);
- return e ? e->v : NVAL;
+ return e ? e->v : nulv();
 }
 
-void tput(tab *t, int k, val v) {
+void tput(tab *t, hash_t k, val v) {
  ent *e = tfind(t, k);
  if (e) {
   e->v = v;
@@ -133,7 +223,10 @@ void tput(tab *t, int k, val v) {
   printf("so\n");
   exit(EXIT_FAILURE);
  } else {
-  t->t[t->s++] = ENT(k, v);
+  ent e;
+  e.k = k;
+  e.v = v;
+  t->t[t->s++] = e;
   qsort(&t->t, t->s, sizeof (ent), cmp);
  }
 }
