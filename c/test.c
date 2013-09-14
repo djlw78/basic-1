@@ -19,7 +19,7 @@ typedef uint32_t hash_t;
 typedef struct { char c; } cval;
 typedef struct { int64_t i; } ival;
 typedef struct { double d; } dval;
-typedef struct { char *s; size_t l; } sval;
+typedef struct { char *s; } sval;
 typedef struct { void (*f)(char **); } fval;
 typedef struct { hash_t h; } hval;
 typedef union { ival iv; dval dv; sval sv; fval fv; hval hv; cval cv; } uval;
@@ -39,8 +39,8 @@ val nulv () {
  val v; v.t = 0; return v;
 }
 
-val strv (int t, char *s, size_t l) {
- val v; v.t = t; v.uv.sv.s = s; v.uv.sv.l = l; return v;
+val strv (int t, char *s) {
+ val v; v.t = t; v.uv.sv.s = s; return v;
 }
 
 val intv (int64_t i) {
@@ -51,22 +51,24 @@ val hashv (hash_t h) {
  val v; v.t = SYM; v.uv.hv.h = h; return v;
 }
 
-int mnt(char **s);
-val gnt(char **s);
-val gs(char **s);
-void tput(tab *t, hash_t k, val v);
-val tget(tab *t, hash_t k);
-hash_t hash(char **s);
-hash_t hashs(char *s);
-val ei(ival i1, ival i2, char c);
-val gne (char **s);
-val gnv (char **s);
-void setl(int64_t l, char *s);
-ent *tfind (tab *t, hash_t k);
-void ex(char *);
-void Print(char **);
-void Let(char **);
-void List(char **);
+int mnt (char **);
+val gnt (char **);
+val gs (char **);
+void tput (tab *, hash_t, val);
+val tget (tab *, hash_t);
+hash_t hash (char **);
+hash_t hashs (char *);
+val intop (val, val, char);
+val strop (val, val, char);
+val gne (char **);
+val gnv (char **);
+void setl (int64_t, char *);
+ent *tfind (tab *, hash_t);
+void ex (char *);
+void del (val);
+void Print (char **);
+void Let (char **);
+void List (char **);
 
 char buf[256];
 tab st;
@@ -78,7 +80,7 @@ int main () {
  tput(&st, hashs("print"), funv(Print));
  tput(&st, hashs("let"), funv(Let));
  tput(&st, hashs("list"), funv(List));
- tput(&st, LZ, strv(LN, NULL, 0));
+ tput(&st, LZ, strv(LN, NULL));
  hp = 0;
  while (1) {
   printf(">");
@@ -92,7 +94,7 @@ int main () {
  return 0;
 }
 
-void ex(char *s) {
+void ex (char *s) {
  val v = gnt(&s);
  if (v.t == SYM) {
   val v2 = tget(&st, v.uv.hv.h);
@@ -107,7 +109,7 @@ void ex(char *s) {
  }
 }
 
-void setl(int64_t l, char *s) {
+void setl (int64_t l, char *s) {
  if (l <= 0 || l >= LZ) {
   printf("invalid line\n");
   return;
@@ -116,17 +118,13 @@ void setl(int64_t l, char *s) {
  if (t != 0) {
   hash_t h = LZ | (hash_t) l;
   int l = strlen(s);
-  char *hs = malloc(l);
-  memcpy(hs, s, l);
-  tput(&st, h, strv(LN, hs, l));
+  char *s2 = memcpy(malloc(l + 1), s, l);
+  printf("malloc %p\n", s2);
+  s2[l] = 0;
+  tput(&st, h, strv(LN, s2));
  } else {
   // remove 
  }
-}
-
-void ps(sval sv) {
- for (int n = 0; n < sv.l; n++)
-  fputc(sv.s[n], stdout);
 }
 
 void List (char **s) {
@@ -135,9 +133,7 @@ void List (char **s) {
  while (i < st.s) {
   ent e = st.t[i];
   if (e.v.t == LN && e.v.uv.sv.s != NULL) {
-   printf("%-4d ", e.k & ~LZ);
-   ps(e.v.uv.sv);
-   printf("\n");
+   printf("%-4d %s\n", e.k & ~LZ, e.v.uv.sv.s);
   }
   i++;
  }
@@ -159,12 +155,8 @@ void Let (char **s) {
   printf("let: expression expected\n");
   return;
  }
- if (v3.t == STR) {
-  char *hs = malloc(v3.uv.sv.l);
-  memcpy(hs, v3.uv.sv.s, v3.uv.sv.l);
-  v3 = strv(STR, hs, v3.uv.sv.l);
- } else if (v3.t == TSTR) {
-  v3 = strv(STR, v3.uv.sv.s, v3.uv.sv.l);
+ if (v3.t == TSTR) {
+  v3 = strv(STR, v3.uv.sv.s);
  }
  tput(&st, v.uv.hv.h, v3);
 }
@@ -173,13 +165,13 @@ void Print (char **s) {
  val v;
  while ((v = gne(s)).t != 0) {
   switch (v.t) {
-   case INT: printf("%" PRId64, v.uv.iv.i); break;
+   case INT: printf("%" PRId64 " ", v.uv.iv.i); break;
    case TSTR:
-   case STR: ps(v.uv.sv); break;
-   case FUN: printf("%p", v.uv.fv.f); break;
-   default: printf("<%d>", v.t);
+   case STR: printf("%s ", v.uv.sv.s); break;
+   case FUN: printf("%p ", v.uv.fv.f); break;
+   default: printf("<%d> ", v.t);
   }
-  fputc(' ', stdout);
+  del(v);
  }
  printf("\n");
 }
@@ -190,32 +182,57 @@ val gne (char **s) {
  if (v.t == 0)
   return v;
  int t = mnt(s);
- if (t != CHR)
+ if (t != CHR) // FIXME should not include )
   return v;
  val c = gnt(s);
  val v2 = gne(s);
  if (v2.t == 0) {
   printf("gne: bad exp\n");
+  del(v);
   return nulv();
  }
- if (v.t == INT && v2.t == INT)
-  return ei(v.uv.iv, v2.uv.iv, c.uv.cv.c);
- printf("gne: bad types in exp\n");
+ val r;
+ if (v.t == INT && v2.t == INT) {
+  r = intop(v, v2, c.uv.cv.c);
+ } else if ((v.t == STR || v.t == TSTR) && (v2.t == STR || v2.t == TSTR)) {
+  r = strop(v, v2, c.uv.cv.c);
+ } else {
+  printf("gne: bad types in exp\n");
+  r = nulv();
+ }
+ del(v);
+ del(v2);
+ return r;
+}
+
+val strop (val s1, val s2, char c) {
+ if (c == '+') {
+  int l1 = strlen(s1.uv.sv.s);
+  int l2 = strlen(s2.uv.sv.s);
+  char *s = memcpy(malloc(l1 + l2 + 1), s1.uv.sv.s, l1);
+  printf("malloc %p\n", s);
+  memcpy(s + l1, s2.uv.sv.s, l2);
+  s[l1 + l2] = 0;
+  return strv(TSTR, s);
+ }
+ printf("unknown str op %c\n", c);
  return nulv();
 }
 
-val ei (ival i1, ival i2, char c) {
+val intop (val v1, val v2, char c) {
+ int64_t i1 = v1.uv.iv.i;
+ int64_t i2 = v2.uv.iv.i;
  int64_t i;
  switch (c) {
-  case '+': i = i1.i + i2.i; break;
-  case '-': i = i1.i - i2.i; break;
-  case '*': i = i1.i * i2.i; break;
-  case '/': i = i1.i / i2.i; break;
-  case '|': i = i1.i | i2.i; break;
-  case '&': i = i1.i & i2.i; break;
-  case '%': i = i1.i % i2.i; break;
-  case '^': i = i1.i ^ i2.i; break;
-  default: printf("ie: unknown op %c\n", c); return nulv();
+  case '+': i = i1 + i2; break;
+  case '-': i = i1 - i2; break;
+  case '*': i = i1 * i2; break;
+  case '/': i = i1 / i2; break;
+  case '|': i = i1 | i2; break;
+  case '&': i = i1 & i2; break;
+  case '%': i = i1 % i2; break;
+  case '^': i = i1 ^ i2; break;
+  default: printf("unknown int op %c\n", c); return nulv();
  }
  return intv(i);
 }
@@ -226,15 +243,26 @@ val gnv (char **s) {
  switch (v.t) {
   case 0:
   case INT:
+  case TSTR:
   case STR: return v;
   case SYM: return tget(&st, v.uv.hv.h);
   case CHR: {
    if (v.uv.cv.c != '(') {
-    printf("gnv: bad value\n");
+    printf("gnv: unexpected character %c\n", v.uv.cv.c);
     return nulv();
    }
    val v2 = gne(s);
-   // TODO
+   if (v2.t == 0) {
+    printf("gnv: missing expression\n");
+    return nulv();
+   }
+   val v3 = gnt(s);
+   if (v3.uv.cv.c != ')') {
+    printf("gnv: missing bracket\n");
+    del(v2);
+    return nulv();
+   }
+   return v2;
   }
  }
  printf("gnv: unknown type %d\n", v.t);
@@ -258,11 +286,19 @@ hash_t hashs (char *s) {
 
 hash_t hash (char **s) {
  hash_t h = 0;
- while (isalnum(**s)) {
-  h = ((h << 7) | **s) | (h >> 25);
-  (*s)++;
+ char c;
+ while (isalnum(c = *(*s)++)) {
+  printf("hash c=%c\n", c);
+  h = ((h << 7) | c) | (h >> 25);
  }
  return h;
+}
+
+void del (val v) {
+ if (v.t == TSTR) {
+  printf("free %p\n", v.uv.sv.s);
+  free(v.uv.sv.s);
+ }
 }
 
 val gs (char **s) {
@@ -270,23 +306,30 @@ val gs (char **s) {
  size_t l = 0;
  char c;
  while ((c = *(*s)++)) {
-  if (c == '"')
-   return strv(STR, s1, l);
+  if (c == '"') {
+   char *s2 = memcpy(malloc(l + 1), s1, l);
+   printf("malloc %p\n", s2);
+   s2[l] = 0;
+   return strv(TSTR, s2);
+  }
   l++;
  }
  return nulv();
 }
 
 int mnt (char **s) {
- while (isspace(**s))
-  (*s)++;
- if (**s == 0)
+ char c;
+ while (isspace(c = **s)) {
+  s[0]++;
+ }
+ printf("mnt t=%c\n", c);
+ if (c == 0)
   return 0;
- if (**s == '"')
+ if (c == '"')
   return STR;
- if (isdigit(**s))
+ if (isdigit(c))
   return INT;
- if (isalpha(**s))
+ if (isalpha(c))
   return SYM;
  return CHR;
 }
