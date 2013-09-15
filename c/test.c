@@ -73,6 +73,7 @@ void List (char **);
 void Goto (char **);
 void End (char **);
 void Run (char **);
+void If (char **);
 
 char buf[256];
 tab st;
@@ -90,6 +91,7 @@ int main () {
  tput(&st, hashs("end"), funv(End));
  tput(&st, hashs("run"), funv(Run));
  tput(&st, hashs("goto"), funv(Goto));
+ tput(&st, hashs("if"), funv(If)); 
  tput(&st, LZ, strv(STRL, NULL));
  hp = 0;
  while (1) {
@@ -143,6 +145,37 @@ void end() {
  End(NULL);
 }
 
+void If (char **s) {
+ // if exp then cmd else cmd1: cmd2
+ val v = gne(s);
+ if (v.t != INT) {
+  printf("if: bad condition\n");
+  end();
+  return;
+ }
+ val v2 = gnt(s);
+ if (v2.t != SYM || v2.uv.hv.h != hashs("then")) {
+  printf("if: then missing\n");
+  end();
+  return;
+ }
+ mnt(s);
+ char *s2 = strstr(*s, " else ");
+ if (v.uv.iv.i) {
+  if (s2) {
+   int l = s2 - *s;
+   char a[l + 1];
+   memcpy(a, *s, l);
+   a[l] = 0;
+   ex(a);
+  } else {
+   ex(*s);
+  }
+ } else if (s2) {
+  ex(s2 + 6);
+ }
+}
+
 void End (char **s) {
  li = st.s;
 }
@@ -169,7 +202,6 @@ void Run (char **s) {
  while (li < st.s) {
   ent e = st.t[li++];
   if (e.v.t == STRL && e.v.uv.sv.s != NULL) {
-   printf("%-4d %s\n", e.k & ~LZ, e.v.uv.sv.s);
    ex(e.v.uv.sv.s);
   }
  }
@@ -375,8 +407,9 @@ hash_t hashs (char *s) {
 hash_t hash (char **s) {
  hash_t h = 0;
  char c;
- while (isalnum(c = *(*s)++)) {
+ while (isalnum(c = **s)) {
   h = ((h << 7) | c) | (h >> 25);
+  (*s)++;
  }
  return h;
 }
