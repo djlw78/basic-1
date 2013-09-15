@@ -14,6 +14,9 @@
 #define TSTR 6
 #define STRL 7
 #define LZ 0xffff0000
+#define FOR 100
+#define REP 101
+#define GOS 102
 
 typedef uint32_t hash_t;
 typedef struct { char c; } cval;
@@ -26,6 +29,9 @@ typedef union { ival iv; dval dv; sval sv; fval fv; hval hv; cval cv; } uval;
 typedef struct { int t; uval uv; } val;
 typedef struct { hash_t k; val v; } ent;
 typedef struct { size_t s; ent t[256]; } tab;
+typedef struct { hash_t h; int64_t e; int64_t s; } fcall;
+typedef union { fcall fc; } ucall;
+typedef struct { int t; int ri; ucall uc; } call;
 
 val chrv (char c) {
  val v; v.t = CHR; v.uv.cv.c = c; return v;
@@ -66,6 +72,7 @@ void setl (int64_t, char *);
 ent *tfind (tab *, hash_t);
 void ex (char *);
 void del (val);
+void trem (tab *, hash_t);
 
 void Print (char **);
 void Let (char **);
@@ -74,6 +81,8 @@ void Goto (char **);
 void End (char **);
 void Run (char **);
 void If (char **);
+void For (char **);
+void Next (char **);
 
 char buf[256];
 tab st;
@@ -81,7 +90,9 @@ char heap[65536];
 size_t hp;
 char *ops = "+-*/|&%^=<>";
 int mc = 0;
-int li;
+int li = 0;
+call cs[16];
+int csp = 0;
 
 int main () {
  printf("BASIC3\n\n");
@@ -92,6 +103,8 @@ int main () {
  tput(&st, hashs("run"), funv(Run));
  tput(&st, hashs("goto"), funv(Goto));
  tput(&st, hashs("if"), funv(If)); 
+ tput(&st, hashs("for"), funv(For)); 
+ tput(&st, hashs("next"), funv(Next)); 
  tput(&st, LZ, strv(STRL, NULL));
  hp = 0;
  while (1) {
@@ -123,30 +136,130 @@ void ex (char *s) {
  }
 }
 
-void setl (int64_t l, char *s) {
- if (l <= 0 || l >= LZ) {
+void setl (int64_t ln, char *s) {
+ if (ln <= 0 || ln >= LZ) {
   printf("invalid line\n");
   return;
  }
+ hash_t h = LZ | (hash_t) ln;
  int t = mnt(&s);
  if (t != 0) {
-  hash_t h = LZ | (hash_t) l;
   int l = strlen(s);
   char *s2 = memcpy(malloc(l + 1), s, l);
   mc++;
   s2[l] = 0;
   tput(&st, h, strv(STRL, s2));
  } else {
-  // remove 
+  trem(&st, h);
  }
 }
 
 void end() {
+ if (li > 0) {
+  ent e = st.t[li];
+  int ln = e.k & ~LZ;
+  printf("end at line %d\n", ln);
+ }
  End(NULL);
 }
 
+void End (char **s) {
+ li = 0;
+ csp = 0;
+}
+
+void For (char **s) {
+ printf("FOR\n");
+ // for sym = exp to exp step exp
+ if (li == 0) {
+  printf("for: not running\n");
+  return;
+ }
+ val v1 = gnt(s);
+ if (v1.t != SYM) {
+  printf("for: bad variable\n");
+  end();
+  return;
+ }
+ val v2 = gnt(s);
+ if (v2.t != CHR || v2.uv.cv.c != '=') {
+  printf("for: equals expected\n");
+  end();
+  return;
+ }
+ val v3 = gne(s);
+ if (v3.t != INT) {
+  printf("for: bad start value\n");
+  del(v3);
+  end();
+  return;
+ }
+ val v4 = gnt(s);
+ if (v4.t != SYM || v4.uv.hv.h != hashs("to")) {
+  printf("for: to expected\n");
+  del(v3);
+  end();
+  return;
+ }
+ val v5 = gne(s);
+ if (v5.t != INT) {
+  printf("for: bad end value\n");
+  del(v3);
+  del(v5);
+  end();
+  return;
+ }
+ call c;
+ c.t = FOR;
+ c.ri = li; // incremented by Run
+ c.uc.fc.h = v1.uv.hv.h;
+ c.uc.fc.s = 1;
+ c.uc.fc.e = v5.uv.iv.i;
+ cs[csp++] = c;
+ tput(&st, v1.uv.hv.h, v3);
+}
+
+void Next (char **s) {
+ val v = gnt(s);
+ if (v.t != 0 && v.t != SYM) {
+  printf("next: bad variable\n");
+  end();
+  return;
+ }
+ if (csp == 0) {
+  printf("next: no calls\n");
+  end();
+  return;
+ }
+ call c = cs[csp - 1];
+ if (c.t != FOR) {
+  printf("next: unbalanced call\n");
+  end();
+  return;
+ }
+ if (v.t != 0 && v.uv.hv.h != c.uc.fc.h) {
+  printf("next: incorrect variable\n");
+  end();
+  return;
+ }
+ val v2 = tget(&st, c.uc.fc.h);
+ if (v2.t != INT) {
+  printf("next: control variable not int\n");
+  end();
+  return;
+ }
+ printf("next csp=%d v=%d e=%d\n", csp, (int) v2.uv.iv.i, (int) c.uc.fc.e);
+ if (v2.uv.iv.i != c.uc.fc.e) {
+  v2.uv.iv.i += c.uc.fc.s;
+  tput(&st, c.uc.fc.h, v2);
+  li = c.ri;
+ } else {
+  csp--;
+ }
+}
+
 void If (char **s) {
- // if exp then cmd else cmd1: cmd2
+ // if exp then cmd else cmd
  val v = gne(s);
  if (v.t != INT) {
   printf("if: bad condition\n");
@@ -176,10 +289,6 @@ void If (char **s) {
  }
 }
 
-void End (char **s) {
- li = st.s;
-}
-
 void Goto (char **s) {
  val v = gne(s);
  if (v.t != INT) {
@@ -199,12 +308,16 @@ void Goto (char **s) {
 void Run (char **s) {
  ent *e1 = tfind(&st, LZ);
  li = e1 - &st.t[0];
- while (li < st.s) {
-  ent e = st.t[li++];
+ while (li > 0 && li < st.s) {
+  ent e = st.t[li];
   if (e.v.t == STRL && e.v.uv.sv.s != NULL) {
+   printf("[%4d] %4d %s\n", li, e.k & ~LZ, e.v.uv.sv.s);
    ex(e.v.uv.sv.s);
   }
+  if (li > 0)
+   li++;
  }
+ End(NULL);
 }
 
 void List (char **s) {
@@ -213,7 +326,7 @@ void List (char **s) {
  while (i < st.s) {
   ent e = st.t[i];
   if (e.v.t == STRL && e.v.uv.sv.s != NULL) {
-   printf("%-4d %s\n", e.k & ~LZ, e.v.uv.sv.s);
+   printf("[%4d] %4d %s\n", i, e.k & ~LZ, e.v.uv.sv.s);
   }
   i++;
  }
@@ -469,6 +582,19 @@ val tget (tab *t, hash_t k) {
  return e ? e->v : nulv();
 }
 
+void trem (tab *t, hash_t h) {
+ ent *e = tfind(t, h);
+ if (e) {
+  val vo = e->v;
+  if (vo.t == STR || vo.t == STRL) {
+   vo.t = TSTR;
+   del(vo);
+  }
+  int i = e - t->t;
+  memmove(e, e + 1, t->s - i);
+ }
+}
+
 void tput (tab *t, hash_t k, val v) {
  ent *e = tfind(t, k);
  if (e) {
@@ -487,6 +613,7 @@ void tput (tab *t, hash_t k, val v) {
   e.v = v;
   t->t[t->s++] = e;
   qsort(&t->t, t->s, sizeof (ent), cmp);
+  // FIXME invalidates indexes...
  }
 }
 
