@@ -63,6 +63,7 @@ char buf[256];
 tab st;
 
 int main() {
+ printf("ival=%lu sval=%lu fval=%lu uval=%lu val=%lu ent=%lu\n", sizeof(ival), sizeof(sval), sizeof(fval), sizeof(uval), sizeof(val), sizeof(ent));
  printf("BASIC3\n\n");
  tput(&st, hashs("print"), funv(Print));
  while (1) {
