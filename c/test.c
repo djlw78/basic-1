@@ -83,6 +83,7 @@ void Run (char **);
 void If (char **);
 void For (char **);
 void Next (char **);
+void Exit (char **);
 
 char buf[256];
 tab st;
@@ -94,12 +95,8 @@ int li = 0;
 call cs[16];
 int csp = 0;
 
-<<<<<<< HEAD
-int main() {
- printf("ival=%lu sval=%lu fval=%lu uval=%lu val=%lu ent=%lu\n", sizeof(ival), sizeof(sval), sizeof(fval), sizeof(uval), sizeof(val), sizeof(ent));
-=======
 int main () {
->>>>>>> c378b6184b4b2437909c9275a6e2d7c94643b963
+ //printf("ival=%lu sval=%lu fval=%lu uval=%lu val=%lu ent=%lu\n", sizeof(ival), sizeof(sval), sizeof(fval), sizeof(uval), sizeof(val), sizeof(ent));
  printf("BASIC3\n\n");
  tput(&st, hashs("print"), funv(Print));
  tput(&st, hashs("let"), funv(Let));
@@ -107,9 +104,10 @@ int main () {
  tput(&st, hashs("end"), funv(End));
  tput(&st, hashs("run"), funv(Run));
  tput(&st, hashs("goto"), funv(Goto));
- tput(&st, hashs("if"), funv(If)); 
- tput(&st, hashs("for"), funv(For)); 
- tput(&st, hashs("next"), funv(Next)); 
+ tput(&st, hashs("if"), funv(If));
+ tput(&st, hashs("for"), funv(For));
+ tput(&st, hashs("next"), funv(Next));
+ tput(&st, hashs("exit"), funv(Exit));
  tput(&st, LZ, strv(STRL, NULL));
  hp = 0;
  while (1) {
@@ -171,6 +169,11 @@ void end() {
 void End (char **s) {
  li = 0;
  csp = 0;
+}
+
+void Exit (char **s) {
+ printf("bye bye\n");
+ exit(EXIT_SUCCESS);
 }
 
 void For (char **s) {
