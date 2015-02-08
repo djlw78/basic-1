@@ -1,12 +1,10 @@
 # basic
 
-A very simple BASIC interpreter for Linux written in Intel assembly language using NASM and GNU Binutils
+## asm
 
-Originally written around Spring 2001 for Linux 2.2, recently updated
+A very simple BASIC interpreter for Linux written in Intel assembly language using NASM
 
-## Screenshot
-
-![Screenshot](https://dl.dropboxusercontent.com/u/8069847/basic.png)
+Originally written around Spring 2001 for Linux 2.2
 
 ## Example program
 
@@ -19,3 +17,7 @@ Originally written around Spring 2001 for Linux 2.2, recently updated
 60 next
 70 print "the number " ia " has " ic " factors"
 </pre>
+
+## c
+
+A very simple BASIC interpreter written in C
